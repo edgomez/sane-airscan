@@ -7,13 +7,17 @@
  */
 
 #include "airscan.h"
+#include "airscan-version.h"
 
 #include <libsoup/soup.h>
 #include <string.h>
+#include <sys/utsname.h>
 
 /******************** Static variables ********************/
 static SoupSession *http_session;
 static http_query  *http_query_list;
+
+static const char useragent_UA[] = "SaneAirScan";
 
 /******************** Forward declarations ********************/
 static void
@@ -372,10 +376,21 @@ http_query_new (http_client *client, http_uri *uri, const char *method,
      * as a workaround
      */
     soup_message_headers_append(q->msg->request_headers, "Connection", "close");
+    soup_message_headers_append(q->msg->request_headers, "Cache-Control", "no-cache");
+    soup_message_headers_append(q->msg->request_headers, "Pragma", "no-cache");
+    {
+        struct utsname sysinfo;
+        if (!uname(&sysinfo)) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "%s/%s %s/%s (%s)",
+                useragent_UA, AIRSCAN_VERSION,
+                sysinfo.sysname, sysinfo.release, sysinfo.machine);
+            soup_message_headers_append(q->msg->request_headers, "User-Agent", buf);
+        }
+    }
     q->callback = callback;
 
     log_debug(client->dev, "HTTP %s %s", q->msg->method, http_uri_str(q->uri));
-
     soup_session_queue_message(http_session, q->msg, http_query_callback, q);
 
     return q;

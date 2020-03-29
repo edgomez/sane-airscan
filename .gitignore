@@ -3,6 +3,7 @@
 libsane-airscan.so.1
 airscan-test
 *.o
+airscan-version.h*
 
 tags
 *.swp

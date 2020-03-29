@@ -46,7 +46,8 @@ SRC = \
 	sane_strstatus.c
 
 HDR = \
-	airscan.h
+	airscan.h \
+	airscan-version.h
 
 OBJS = $(SRC:.c=.o)
 
@@ -100,6 +101,29 @@ airscan-test: airscan-test.c $(BACKEND)
 $(OBJS): CFLAGS += $(airscan_CFLAGS)
 $(OBJS): Makefile $(HDR)
 
+# generate a vesion file from GIT information for devs
+# for source packages, the .git dir is stripped, so let the opportunity
+# to ship the sources package with a static .version bundled that would
+# contain the correct version label
+define update_version_header
+	printf "#ifndef AIRSCAN_VERSION_H\n#define AIRSCAN_VERSION_H\n\n#define AIRSCAN_VERSION \"%s\"\n\n#endif\n" \
+		"$(1)" > airscan-version.h.tmp; \
+	if ! cmp airscan-version.h airscan-version.h.tmp >/dev/null 2>&1; then \
+		cp airscan-version.h.tmp airscan-version.h ; \
+	fi ; \
+	rm -f airscan-version.h.tmp
+endef
+
+airscan-version.h: Makefile
+	if [ -f .version ] ; then \
+		$(call update_airscan_version,$(shell cat .version)); \
+	elif [ -d .git ] ; then \
+		$(call update_airscan_version,$(shell git describe --tags --always --dirty)); \
+	else \
+		$(call update_airscan_version,unknown); \
+	fi
+.PHONY: airscan-version.h
+
 install: all
 	mkdir -p $(PREFIX)$(CONFDIR)
 	mkdir -p $(PREFIX)$(CONFDIR)/dll.d
@@ -112,5 +136,5 @@ install: all
 .PHONY: install
 
 clean:
-	rm -f airscan-test $(BACKEND) $(OBJS) tags
+	rm -f airscan-test $(BACKEND) $(OBJS) airscan-version.h tags
 .PHONY: clean
