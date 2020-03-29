@@ -14,10 +14,10 @@
 #   COMPRESS gzip                     Program to compress man page, or ""
 #   MANDIR   /usr/share/man/          Where to install man page
 
-CC	= gcc
+CC = gcc
 COMPRESS = gzip
-CFLAGS	= -O2 -g -W -Wall -Werror
-MANDIR	= /usr/share/man/
+CFLAGS = -Og -g -W -Wall
+MANDIR = /usr/share/man/
 PKG_CONFIG = /usr/bin/pkg-config
 
 # These variables are not intended to be user-settable
@@ -26,7 +26,7 @@ LIBDIR := $(shell $(PKG_CONFIG) --variable=libdir sane-backends)
 BACKEND = libsane-airscan.so.1
 MANPAGE = sane-airscan.5
 
-SRC	= \
+SRC = \
 	airscan.c \
 	airscan-array.c \
 	airscan-conf.c \
@@ -45,15 +45,23 @@ SRC	= \
 	airscan-zeroconf.c \
 	sane_strstatus.c
 
-# Obtain CFLAGS for libraries
-airscan_CFLAGS	= $(CFLAGS)
+HDR = \
+	airscan.h
+
+OBJS = $(SRC:.c=.o)
+
+airscan_pkgconf_deps := \
+	avahi-client \
+	avahi-glib \
+	libjpeg \
+	libsoup-2.4
+
+# Obtain CFLAGS for objects creation
 airscan_CFLAGS += -fPIC
-airscan_CFLAGS += `pkg-config --cflags --libs avahi-client`
-airscan_CFLAGS += `pkg-config --cflags --libs avahi-glib`
-airscan_CFLAGS += `pkg-config --cflags --libs libjpeg`
-airscan_CFLAGS += `pkg-config --cflags --libs libsoup-2.4`
-airscan_CFLAGS += `pkg-config --cflags --libs libxml-2.0`
-airscan_CFLAGS += -Wl,--version-script=airscan.sym
+airscan_CFLAGS += $(foreach dep,$(airscan_pkgconf_deps),`pkg-config --cflags $(dep)`)
+
+# Obtain LDFLAGS for library creation
+airscan_LDLAGS += $(foreach dep,$(airscan_pkgconf_deps),`pkg-config --libs $(dep)`)
 
 # Merge DESTDIR and PREFIX
 PREFIX := $(abspath $(DESTDIR)/$(PREFIX))
@@ -74,13 +82,23 @@ endif
 # The workaround is to prevent our backend's shared object from being
 # unloaded when not longer in use, and these magical options do it
 # by adding NODELETE flag to the resulting ELF shared object
-airscan_CFLAGS += -Wl,-z,nodelete
+airscan_LDFLAGS += -Wl,-z,nodelete
 
-all:	$(BACKEND) test
+all: tags $(BACKEND) airscan-test
 
-$(BACKEND): Makefile $(SRC) airscan.h airscan.sym
+tags: Makefile $(SRC) $(HDR)
+	echo $(SRC)
 	-ctags -R .
-	$(CC) -o $(BACKEND) -shared $(CPPFLAGS) $(SRC) $(airscan_CFLAGS) $(LDFLAGS)
+
+$(BACKEND): LDFLAGS += $(airscan_LDLAGS)
+$(BACKEND): Makefile $(OBJS) airscan.sym
+	$(CC) -o $(BACKEND) -shared $(OBJS) -Wl,--version-script=airscan.sym $(LDFLAGS)
+
+airscan-test: airscan-test.c $(BACKEND)
+	$(CC) -o $@ $^ -Wl,-rpath . ${airscan_CFLAGS}
+
+$(OBJS): CFLAGS += $(airscan_CFLAGS)
+$(OBJS): Makefile $(HDR)
 
 install: all
 	mkdir -p $(PREFIX)$(CONFDIR)
@@ -91,9 +109,8 @@ install: all
 	mkdir -p $(PREFIX)/$(MANDIR)/man5
 	install -m 644 -D -t $(PREFIX)$(MANDIR)/man5 $(MANPAGE)
 	[ "$(COMPRESS)" = "" ] || $(COMPRESS) -f $(PREFIX)$(MANDIR)/man5/$(MANPAGE)
+.PHONY: install
 
 clean:
-	rm -f test $(BACKEND) tags
-
-test:	$(BACKEND) test.c
-	$(CC) -o test test.c $(BACKEND) -Wl,-rpath . ${airscan_CFLAGS}
+	rm -f airscan-test $(BACKEND) $(OBJS) tags
+.PHONY: clean

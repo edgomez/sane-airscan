@@ -1,7 +1,8 @@
 # http://www.gnu.org/software/automake
 
 libsane-airscan.so.1
-test
+airscan-test
+*.o
 
 tags
 *.swp
