@@ -676,6 +676,11 @@ xml_wr_add_bool (xml_wr *xml, const char *name, bool value);
 void
 xml_wr_enter (xml_wr *xml, const char *name);
 
+/* Add an attribute to current node
+ */
+void
+xml_wr_add_attr (xml_wr *xml, const char *name, const char *value);
+
 /* Leave the current node
  */
 void

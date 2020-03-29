@@ -981,6 +981,8 @@ device_escl_start_scan (device *dev)
 
     /* Build scan request */
     xml_wr *xml = xml_wr_begin("scan:ScanSettings");
+    xml_wr_add_attr(xml, "xmlns:pwg", "http://www.pwg.org/schemas/2010/12/sm");
+    xml_wr_add_attr(xml, "xmlns:scan", "http://schemas.hp.com/imaging/escl/2011/05/03");
 
     xml_wr_add_text(xml, "pwg:Version", "2.0");
 

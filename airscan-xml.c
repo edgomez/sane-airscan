@@ -215,6 +215,7 @@ struct xml_wr_node {
     xml_wr_node *children; /* Node children, if any */
     xml_wr_node *next;     /* Next sibling node, if any */
     xml_wr_node *parent;   /* Parent node, if any */
+    xml_wr_node *attr;     /* Attribute if any */
 
 };
 
@@ -243,8 +244,14 @@ xml_wr_node_new (const char *name, const char *value)
 static void
 xml_wr_node_free (xml_wr_node *node)
 {
+    xml_wr_node *node2, *next;
     g_free((char*) node->name);
     g_free((char*) node->value);
+    for (node2 = node->attr; node2 != NULL; node2 = next) {
+        next = node2->next;
+        g_free(node2);
+    }
+
     g_free(node);
 }
 
@@ -290,19 +297,21 @@ xml_wr_format_indent(GString *buf, unsigned int indent)
 static void
 xml_wr_format_node (GString *buf, xml_wr_node *node, unsigned int indent)
 {
+        xml_wr_node *node2;
+
         xml_wr_format_indent(buf, indent);
 
         g_string_append_printf(buf, "<%s", node->name);
-        if (indent == 0) {
-            /* Root node defines namespaces */
-            g_string_append_c(buf, ' ');
-            g_string_append(buf, "xmlns:pwg=\"http://www.pwg.org/schemas/2010/12/sm\" ");
-            g_string_append(buf, "xmlns:scan=\"http://schemas.hp.com/imaging/escl/2011/05/03\"");
+        for (node2 = node->attr; node2 != NULL; node2 = node2->next) {
+            if (node2->value) {
+                g_string_append_printf(buf, " %s=\"%s\"", node2->name, node2->value);
+            } else {
+                g_string_append_printf(buf, " %s", node2->name);
+            }
         }
         g_string_append_c(buf, '>');
 
         if (node->children) {
-            xml_wr_node *node2;
 
             g_string_append_c(buf, '\n');
             for (node2 = node->children; node2 != NULL; node2 = node2->next) {
@@ -399,6 +408,16 @@ xml_wr_enter (xml_wr *xml, const char *name)
     xml_wr_node *node = xml_wr_node_new(name, NULL);
     xml_wr_add_node(xml, node);
     xml->current = node;
+}
+
+/* Add an attribute to current node
+ */
+void
+xml_wr_add_attr (xml_wr *xml, const char *name, const char *value)
+{
+    xml_wr_node *node = xml_wr_node_new(name, value);
+    node->next = xml->current->attr;
+    xml->current->attr = node;
 }
 
 /* Leave the current node
